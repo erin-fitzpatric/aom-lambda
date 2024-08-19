@@ -2,7 +2,8 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 dotenv.config();
 
-const BASE_URL = process.env.MYTH_BASE_URL || "https://aoe-api.worldsedgelink.com/";
+const BASE_URL =
+  process.env.MYTH_BASE_URL || "https://aoe-api.worldsedgelink.com/";
 const ROUTE = "/community/leaderboard/getLeaderBoard2";
 const DEFAULT_PARAMS = {
   leaderboard_id: "3", // Update as needed
@@ -30,6 +31,7 @@ async function fetchLeaderboardData(skip) {
 }
 
 function mapLeaderboardData(leaderboardStats, statGroups) {
+  console.log("Mapping leaderboard data...");
   const leaderboardStatsMap = new Map(
     leaderboardStats.map((stat) => [stat.statgroup_id, stat])
   );
@@ -51,27 +53,41 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
   });
 }
 
+const leaderboardPlayerSchema = new mongoose.Schema({
+  id: Number,
+  name: { type: String, index: true },
+  profileUrl: String,
+  country: String,
+  rank: Number,
+  wins: Number,
+  losses: Number,
+  winPercent: Number,
+  totalGames: Number,
+});
+
+const LeaderboardPlayers = mongoose.models.LeaderboardPlayers || mongoose.model('LeaderboardPlayers', leaderboardPlayerSchema);
+
 async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
+  console.log("Saving to MongoDB...");
   try {
     await mongoose.connect(process.env.MONGODB_URI);
 
-    // drop collection if it exists
-    await mongoose.connection.db.dropCollection("leaderboardplayers").catch(() => {});
+    // Drop collection if it exists
+    await mongoose.connection.db
+      .dropCollection("leaderboardplayers")
+      .catch(() => {});
 
-    const leaderboardPlayerSchema = new mongoose.Schema({
-      id: Number,
-      name: { type: String, index: true },
-      profileUrl: String,
-      country: String,
-      rank: Number,
-      wins: Number,
-      losses: Number,
-      winPercent: Number,
-      totalGames: Number,
-    });
+    console.log("Beginning batch insert");
 
-    const LeaderboardPlayers = mongoose.model("LeaderboardPlayers", leaderboardPlayerSchema);
-    await LeaderboardPlayers.insertMany(mappedLeaderboardData);
+    // Batch size
+    const BATCH_SIZE = 1000;
+    // console.log(`Inserting ${mappedLeaderboardData.length} records in batches of ${BATCH_SIZE}...`);
+    for (let i = 0; i < mappedLeaderboardData.length; i += BATCH_SIZE) {
+      const batch = mappedLeaderboardData.slice(i, i + BATCH_SIZE);
+      await LeaderboardPlayers.insertMany(batch, { ordered: false });
+      console.log(`Inserted batch ${i / BATCH_SIZE + 1} / ${Math.ceil(mappedLeaderboardData.length / BATCH_SIZE)}`);
+    }
+
     console.log("Saved to MongoDB successfully");
   } catch (error) {
     console.error("Error saving to MongoDB", error);
@@ -96,7 +112,10 @@ export const lambdaHandler = async (_event, _context) => {
       skip += 200;
     } while (skip < leaderboardData.rankTotal);
 
-    const mappedLeaderboardData = mapLeaderboardData(leaderboardStats, statGroups);
+    const mappedLeaderboardData = mapLeaderboardData(
+      leaderboardStats,
+      statGroups
+    );
     await saveLeaderboardDataToMongo(mappedLeaderboardData);
 
     return {

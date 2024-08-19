@@ -4,8 +4,8 @@ Description: SAM Template for Leaderboard Extractor
 
 Globals:
   Function:
-    Timeout: 100
-    MemorySize: 128
+    Timeout: 300
+    MemorySize: 256
     Runtime: nodejs20.x
     Architectures:
       - x86_64
@@ -20,7 +20,7 @@ Resources:
         ExtractLeaderboard:
           Type: Schedule
           Properties:
-            Schedule: rate(2 minutes)
+            Schedule: rate(5 minutes)
 
 Outputs:
   LeaderboardExtractorFunctionArn:
