@@ -56,9 +56,9 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
     await mongoose.connect(process.env.MONGODB_URI);
 
     // drop collection if it exists
-    await mongoose.connection.db.dropCollection("leaderboards").catch(() => {});
+    await mongoose.connection.db.dropCollection("leaderboardplayers").catch(() => {});
 
-    const leaderboardSchema = new mongoose.Schema({
+    const leaderboardPlayerSchema = new mongoose.Schema({
       id: Number,
       name: { type: String, index: true },
       profileUrl: String,
@@ -70,8 +70,8 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
       totalGames: Number,
     });
 
-    const Leaderboard = mongoose.model("Leaderboard", leaderboardSchema);
-    await Leaderboard.insertMany(mappedLeaderboardData);
+    const LeaderboardPlayers = mongoose.model("LeaderboardPlayers", leaderboardPlayerSchema);
+    await LeaderboardPlayers.insertMany(mappedLeaderboardData);
     console.log("Saved to MongoDB successfully");
   } catch (error) {
     console.error("Error saving to MongoDB", error);
@@ -81,7 +81,7 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
   }
 }
 
-export const lambdaHandler = async (event, context) => {
+export const lambdaHandler = async (_event, _context) => {
   try {
     console.log("Fetching leaderboard data...");
     let skip = 1;
