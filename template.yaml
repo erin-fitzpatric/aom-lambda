@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM Template for Leaderboard Extractor
+
+Globals:
+  Function:
+    Timeout: 100
+    MemorySize: 128
+    Runtime: nodejs20.x
+    Architectures:
+      - x86_64
+    Handler: app.lambdaHandler
+
+Resources:
+  LeaderboardExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: extract-leaderboard/
+      Events:
+        ExtractLeaderboard:
+          Type: Schedule
+          Properties:
+            Schedule: rate(2 minutes)
+
+Outputs:
+  LeaderboardExtractorFunctionArn:
+    Description: "ARN for the Leaderboard Extractor function"
+    Value: !GetAtt LeaderboardExtractorFunction.Arn
