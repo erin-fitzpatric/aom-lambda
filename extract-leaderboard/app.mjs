@@ -40,7 +40,7 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
     const playerStats = leaderboardStatsMap.get(statGroup.id);
     const totalGames = playerStats.wins + playerStats.losses;
     return {
-      id: playerStats.id,
+      id: statGroup.id,
       name: statGroup.members[0].alias,
       profileUrl: statGroup.members[0].name,
       country: statGroup.members[0].country,
@@ -54,7 +54,7 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
 }
 
 const leaderboardPlayerSchema = new mongoose.Schema({
-  id: Number,
+  id: { type: Number, index: true },
   name: { type: String, index: true },
   profileUrl: String,
   country: String,
@@ -65,30 +65,51 @@ const leaderboardPlayerSchema = new mongoose.Schema({
   totalGames: Number,
 });
 
-const LeaderboardPlayers = mongoose.models.LeaderboardPlayers || mongoose.model('LeaderboardPlayers', leaderboardPlayerSchema);
+const LeaderboardPlayers =
+  mongoose.models.LeaderboardPlayers ||
+  mongoose.model("LeaderboardPlayers", leaderboardPlayerSchema);
 
 async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
-  console.log("Saving to MongoDB...");
+  console.log("Saving leaderboard data to MongoDB...");
+  await mongoose.connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 30000, // Increase timeout to 30 seconds
+  });
+
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    const chunkSize = 1000;
+    const chunks = [];
 
-    // Drop collection if it exists
-    await mongoose.connection.db
-      .dropCollection("leaderboardplayers")
-      .catch(() => {});
-
-    console.log("Beginning batch insert");
-
-    // Batch size
-    const BATCH_SIZE = 1000;
-    // console.log(`Inserting ${mappedLeaderboardData.length} records in batches of ${BATCH_SIZE}...`);
-    for (let i = 0; i < mappedLeaderboardData.length; i += BATCH_SIZE) {
-      const batch = mappedLeaderboardData.slice(i, i + BATCH_SIZE);
-      await LeaderboardPlayers.insertMany(batch, { ordered: false });
-      console.log(`Inserted batch ${i / BATCH_SIZE + 1} / ${Math.ceil(mappedLeaderboardData.length / BATCH_SIZE)}`);
+    // Split the data into chunks
+    for (let i = 0; i < mappedLeaderboardData.length; i += chunkSize) {
+      chunks.push(mappedLeaderboardData.slice(i, i + chunkSize));
     }
 
-    console.log("Saved to MongoDB successfully");
+    // Function to process a chunk
+    const processChunk = async (chunk, index) => {
+      const bulkOps = chunk.map((data) => ({
+        replaceOne: {
+          filter: { id: data.id },
+          replacement: {
+            id: data.id,
+            country: data.country,
+            losses: data.losses,
+            name: data.name,
+            profileUrl: data.profileUrl,
+            rank: data.rank,
+            totalGames: data.totalGames,
+            winPercent: data.winPercent,
+          },
+          upsert: true,
+        },
+      }));
+
+      await LeaderboardPlayers.bulkWrite(bulkOps, { ordered: false });
+    };
+
+    // Process all chunks concurrently
+    await Promise.all(chunks.map((chunk, index) => processChunk(chunk, index)));
+
+    console.log("Leaderboard data saved to MongoDB");
   } catch (error) {
     console.error("Error saving to MongoDB", error);
     throw error;
