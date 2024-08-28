@@ -2,13 +2,18 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 dotenv.config();
 
+// 1,1v1Supremacy
+// 2,TeamSupremacy
+// 3,Deathmatch
+// 4,TeamDeathmatch
+
 const BASE_URL =
-  process.env.MYTH_BASE_URL || "https://aoe-api.worldsedgelink.com/";
+  process.env.MYTH_BASE_URL || "https://athens-live-api.worldsedgelink.com/";
 const ROUTE = "/community/leaderboard/getLeaderBoard2";
 const DEFAULT_PARAMS = {
-  leaderboard_id: "3", // Update as needed
+  leaderboard_id: "1", // Update as needed
   platform: "PC_STEAM", // Update as needed
-  title: "age2", // Update as needed
+  title: "athens",
   sortBy: "1",
   count: "200",
 };
@@ -40,13 +45,14 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
     const playerStats = leaderboardStatsMap.get(statGroup.id);
     const totalGames = playerStats.wins + playerStats.losses;
     return {
+      ...playerStats,
       id: statGroup.id,
+      personal_statgroup_id: statGroup.members[0].personal_statgroup_id,
+      profile_id: statGroup.members[0].profile_id,
+      level: statGroup.members[0].level,
       name: statGroup.members[0].alias,
       profileUrl: statGroup.members[0].name,
       country: statGroup.members[0].country,
-      rank: playerStats.rank,
-      wins: playerStats.wins,
-      losses: playerStats.losses,
       winPercent: playerStats.wins / totalGames,
       totalGames,
     };
@@ -54,13 +60,29 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
 }
 
 const leaderboardPlayerSchema = new mongoose.Schema({
-  id: { type: Number, index: true },
+  statgroup_id: { type: Number, index: true },
+  leaderboard_id: Number,
+  wins: Number,
+  losses: Number,
+  streak: Number,
+  disputes: Number,
+  drops: Number,
+  rank: Number,
+  ranktotal: Number,
+  ranklevel: Number,
+  rating: Number,
+  regionrank: Number,
+  regionranktotal: Number,
+  lastmatchdate: Number,
+  highestrank: Number,
+  highestranklevel: Number,
+  highestrating: Number,
+  personal_statgroup_id: Number,
+  profile_id: Number,
+  level: Number,
   name: { type: String, index: true },
   profileUrl: String,
   country: String,
-  rank: Number,
-  wins: Number,
-  losses: Number,
   winPercent: Number,
   totalGames: Number,
 });
@@ -85,19 +107,36 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
     }
 
     // Function to process a chunk
-    const processChunk = async (chunk, index) => {
+    const processChunk = async (chunk) => {
       const bulkOps = chunk.map((data) => ({
         replaceOne: {
-          filter: { id: data.id },
+          filter: { statgroup_id: data.statgroup_id },
           replacement: {
-            id: data.id,
-            country: data.country,
+            statgroup_id: data.statgroup_id,
+            leaderboard_id: data.leaderboard_id,
+            wins: data.wins,
             losses: data.losses,
+            streak: data.streak,
+            disputes: data.disputes,
+            drops: data.drops,
+            rank: data.rank,
+            ranktotal: data.ranktotal,
+            ranklevel: data.ranklevel,
+            rating: data.rating,
+            regionrank: data.regionrank,
+            regionranktotal: data.regionranktotal,
+            lastmatchdate: data.lastmatchdate,
+            highestrank: data.highestrank,
+            highestranklevel: data.highestranklevel,
+            highestrating: data.highestrating,
+            personal_statgroup_id: data.personal_statgroup_id,
+            profile_id: data.profile_id,
+            level: data.level,
             name: data.name,
             profileUrl: data.profileUrl,
-            rank: data.rank,
-            totalGames: data.totalGames,
+            country: data.country,
             winPercent: data.winPercent,
+            totalGames: data.totalGames,
           },
           upsert: true,
         },
@@ -107,7 +146,7 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
     };
 
     // Process all chunks concurrently
-    await Promise.all(chunks.map((chunk, index) => processChunk(chunk, index)));
+    await Promise.all(chunks.map(processChunk));
 
     console.log("Leaderboard data saved to MongoDB");
   } catch (error) {
