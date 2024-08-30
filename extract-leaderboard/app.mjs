@@ -111,7 +111,7 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
     const processChunk = async (chunk) => {
       const bulkOps = chunk.map((data) => ({
         replaceOne: {
-          filter: { statgroup_id: data.statgroup_id },
+          filter: { statgroup_id: data.statgroup_id, leaderboard_id: data.leaderboard_id},
           replacement: {
             statgroup_id: data.statgroup_id,
             leaderboard_id: data.leaderboard_id,
