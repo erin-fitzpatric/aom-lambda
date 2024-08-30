@@ -6,21 +6,22 @@ dotenv.config();
 // 2,TeamSupremacy
 // 3,Deathmatch
 // 4,TeamDeathmatch
+const LEADERBOARD_IDS = [1, 2, 3, 4];
 
 const BASE_URL =
   process.env.MYTH_BASE_URL || "https://athens-live-api.worldsedgelink.com/";
 const ROUTE = "/community/leaderboard/getLeaderBoard2";
 const DEFAULT_PARAMS = {
-  leaderboard_id: "1", // Update as needed
   platform: "PC_STEAM", // Update as needed
   title: "athens",
   sortBy: "1",
   count: "200",
 };
 
-async function fetchLeaderboardData(skip) {
+async function fetchLeaderboardData(skip, leaderboardId) {
   const params = {
     ...DEFAULT_PARAMS,
+    leaderboard_id: leaderboardId.toString(),
     start: skip.toString(),
   };
 
@@ -61,7 +62,7 @@ function mapLeaderboardData(leaderboardStats, statGroups) {
 
 const leaderboardPlayerSchema = new mongoose.Schema({
   statgroup_id: { type: Number, index: true },
-  leaderboard_id: Number,
+  leaderboard_id: { type: Number, index: true },
   wins: Number,
   losses: Number,
   streak: Number,
@@ -159,24 +160,26 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
 
 export const lambdaHandler = async (_event, _context) => {
   try {
-    console.log("Fetching leaderboard data...");
-    let skip = 1;
-    const leaderboardStats = [];
-    const statGroups = [];
-    let leaderboardData;
+    for (const leaderboardId of LEADERBOARD_IDS) {
+      console.log("Fetching leaderboard data for leaderboard ID:", leaderboardId);
+      let skip = 1;
+      const leaderboardStats = [];
+      const statGroups = [];
+      let leaderboardData;
 
-    do {
-      leaderboardData = await fetchLeaderboardData(skip);
-      leaderboardStats.push(...leaderboardData.leaderboardStats);
-      statGroups.push(...leaderboardData.statGroups);
-      skip += 200;
-    } while (skip < leaderboardData.rankTotal);
+      do {
+        leaderboardData = await fetchLeaderboardData(skip, leaderboardId);
+        leaderboardStats.push(...leaderboardData.leaderboardStats);
+        statGroups.push(...leaderboardData.statGroups);
+        skip += 200;
+      } while (skip < leaderboardData.rankTotal);
 
-    const mappedLeaderboardData = mapLeaderboardData(
-      leaderboardStats,
-      statGroups
-    );
-    await saveLeaderboardDataToMongo(mappedLeaderboardData);
+      const mappedLeaderboardData = mapLeaderboardData(
+        leaderboardStats,
+        statGroups
+      );
+      await saveLeaderboardDataToMongo(mappedLeaderboardData);
+    }
 
     return {
       statusCode: 200,
