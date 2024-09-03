@@ -1,0 +1,14 @@
+{
+  "name": "match-extractor",
+  "version": "1.0.0",
+  "description": "AoM Match Extractor",
+  "main": "app.js",
+  "repository": "https://github.com/awslabs/aws-sam-cli/tree/develop/samcli/local/init/templates/cookiecutter-aws-sam-hello-nodejs",
+  "author": "Erin Fitzpatric",
+  "license": "MIT",
+  "dependencies": {
+    "axios": ">=1.6.0",
+    "dotenv": "^16.4.5",
+    "mongoose": "^8.5.3"
+  }
+}

@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import { SQSClient, SendMessageCommand } from "@aws-sdk/client-sqs";
+
 dotenv.config();
 
 // 1,1v1Supremacy
@@ -17,6 +19,9 @@ const DEFAULT_PARAMS = {
   sortBy: "1",
   count: "200",
 };
+
+// Initialize the SQS client
+const sqs = new SQSClient({ region: process.env.AWS_REGION });
 
 async function fetchLeaderboardData(skip, leaderboardId) {
   const params = {
@@ -107,49 +112,58 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
       chunks.push(mappedLeaderboardData.slice(i, i + chunkSize));
     }
 
+    // Track profile_ids with increased totalGames
+    const profileIdsWithIncreasedTotalGames = new Set();
+
     // Function to process a chunk
     const processChunk = async (chunk) => {
-      const bulkOps = chunk.map((data) => ({
-        replaceOne: {
-          filter: { statgroup_id: data.statgroup_id, leaderboard_id: data.leaderboard_id},
-          replacement: {
-            statgroup_id: data.statgroup_id,
-            leaderboard_id: data.leaderboard_id,
-            wins: data.wins,
-            losses: data.losses,
-            streak: data.streak,
-            disputes: data.disputes,
-            drops: data.drops,
-            rank: data.rank,
-            ranktotal: data.ranktotal,
-            ranklevel: data.ranklevel,
-            rating: data.rating,
-            regionrank: data.regionrank,
-            regionranktotal: data.regionranktotal,
-            lastmatchdate: data.lastmatchdate,
-            highestrank: data.highestrank,
-            highestranklevel: data.highestranklevel,
-            highestrating: data.highestrating,
-            personal_statgroup_id: data.personal_statgroup_id,
-            profile_id: data.profile_id,
-            level: data.level,
-            name: data.name,
-            profileUrl: data.profileUrl,
-            country: data.country,
-            winPercent: data.winPercent,
-            totalGames: data.totalGames,
+      // Fetch existing documents
+      const existingDocuments = await LeaderboardPlayers.find({
+        statgroup_id: { $in: chunk.map((data) => data.statgroup_id) },
+        leaderboard_id: { $in: chunk.map((data) => data.leaderboard_id) },
+      }).lean();
+
+      const existingMap = new Map(
+        existingDocuments.map((doc) => [
+          `${doc.statgroup_id}_${doc.leaderboard_id}`,
+          doc,
+        ])
+      );
+
+      const bulkOps = chunk.map((data) => {
+        const key = `${data.statgroup_id}_${data.leaderboard_id}`;
+        const existingDoc = existingMap.get(key);
+
+        // Check if totalGames increased
+        if (existingDoc && existingDoc.totalGames < data.totalGames) {
+          profileIdsWithIncreasedTotalGames.add(data.profile_id);
+        }
+
+        return {
+          replaceOne: {
+            filter: {
+              statgroup_id: data.statgroup_id,
+              leaderboard_id: data.leaderboard_id,
+            },
+            replacement: data,
+            upsert: true,
           },
-          upsert: true,
-        },
-      }));
+        };
+      });
 
       await LeaderboardPlayers.bulkWrite(bulkOps, { ordered: false });
     };
 
     // Process all chunks concurrently
     await Promise.all(chunks.map(processChunk));
-
     console.log("Leaderboard data saved to MongoDB");
+
+    // Log profile_ids with increased totalGames
+    console.log(
+      "Profile IDs with increased totalGames:",
+      Array.from(profileIdsWithIncreasedTotalGames)
+    );
+    return Array.from(profileIdsWithIncreasedTotalGames);
   } catch (error) {
     console.error("Error saving to MongoDB", error);
     throw error;
@@ -158,10 +172,41 @@ async function saveLeaderboardDataToMongo(mappedLeaderboardData) {
   }
 }
 
+async function sendMessagesToSQS(profileIds) {
+  console.log("Sending message to SQS...");
+
+  // Convert the profile IDs array to a JSON string
+  const messageBody = JSON.stringify(profileIds);
+
+  const params = {
+    QueueUrl: process.env.SQS_QUEUE_URL,
+    MessageBody: messageBody,
+  };
+
+  try {
+    const command = new SendMessageCommand(params);
+    await sqs.send(command);
+    console.log(`Pushed ${profileIds.length} messages to SQS`);
+  } catch (error) {
+    console.error("Error sending message to SQS", error);
+  }
+}
+
+function chunkArray(array, size) {
+  const result = [];
+  for (let i = 0; i < array.length; i += size) {
+    result.push(array.slice(i, i + size));
+  }
+  return result;
+}
+
 export const lambdaHandler = async (_event, _context) => {
   try {
     for (const leaderboardId of LEADERBOARD_IDS) {
-      console.log("Fetching leaderboard data for leaderboard ID:", leaderboardId);
+      console.log(
+        "Fetching leaderboard data for leaderboard ID:",
+        leaderboardId
+      );
       let skip = 1;
       const leaderboardStats = [];
       const statGroups = [];
@@ -178,9 +223,18 @@ export const lambdaHandler = async (_event, _context) => {
         leaderboardStats,
         statGroups
       );
-      await saveLeaderboardDataToMongo(mappedLeaderboardData);
-    }
+      const updatedProfileIds = await saveLeaderboardDataToMongo(
+        mappedLeaderboardData
+      );
 
+      // Batch updatedProfileIds array into batches of 200 ids
+      const batches = chunkArray(updatedProfileIds, 200);
+
+      // Send each batch to SQS
+      for (const batch of batches) {
+        await sendMessagesToSQS(batch);
+      }
+    }
     return {
       statusCode: 200,
       body: JSON.stringify({ message: "Leaderboard extraction successful" }),

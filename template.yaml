@@ -21,8 +21,20 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: rate(5 minutes)
+  MatchExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: extract-matches/
+      Events:
+        ExtractLeaderboard:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 hours)
 
 Outputs:
   LeaderboardExtractorFunctionArn:
     Description: "ARN for the Leaderboard Extractor function"
     Value: !GetAtt LeaderboardExtractorFunction.Arn
+  MatchExtractorFunctionArn:
+    Description: "ARN for the Match Extractor function"
+    Value: !GetAtt MatchExtractorFunction.Arn
