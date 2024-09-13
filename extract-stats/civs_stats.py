@@ -8,24 +8,21 @@ password = os.getenv("MONGO_PASS")
 mongo_url = os.getenv("MONGO_URL")
 
 # mongo params
-mongo_uri = f"mongodb+srv://{username}:{password}@{mongo_url}"
-client = MongoClient(mongo_uri)
+full_url = f"mongodb+srv://{username}:{password}@{mongo_url}"
+client = MongoClient(full_url)
 db = client["test"]
 collection = db["matches"]
 
 # mongo civs stats pipeline -------------------------------------------
 def civ_stats_pipeline(start_date, end_date):
-    pipeline =[
+    pipeline = [
     {
         '$match': {
+            'gameMode': '1V1_SUPREMACY',
             'matchDate': {
                 '$gte': start_date, 
                 '$lt': end_date
             }
-        }
-    }, {
-        '$match': {
-            'gameMode': '1V1_SUPREMACY'
         }
     }, {
         '$project': {
@@ -138,194 +135,77 @@ def civ_stats_pipeline(start_date, end_date):
                         {
                             'case': {
                                 '$lt': [
-                                    '$cleanmatchHistory.avg_elo', 800
+                                    '$cleanmatchHistory.avg_elo', 751
                                 ]
                             }, 
-                            'then': '0-799'
+                            'then': '0-750'
                         }, {
                             'case': {
                                 '$lt': [
-                                    '$cleanmatchHistory.avg_elo', 1000
+                                    '$cleanmatchHistory.avg_elo', 1001
                                 ]
                             }, 
-                            'then': '800-999'
+                            'then': '751-1000'
                         }, {
                             'case': {
                                 '$lt': [
-                                    '$cleanmatchHistory.avg_elo', 1200
+                                    '$cleanmatchHistory.avg_elo', 1251
                                 ]
                             }, 
-                            'then': '1000-1199'
+                            'then': '1001-1250'
                         }, {
                             'case': {
                                 '$lt': [
-                                    '$cleanmatchHistory.avg_elo', 1400
+                                    '$cleanmatchHistory.avg_elo', 1501
                                 ]
                             }, 
-                            'then': '1200-1399'
+                            'then': '1251-1500'
                         }, {
+                            'case': {
+                                '$lt': [
+                                    '$cleanmatchHistory.avg_elo', 1751
+                                ]
+                            }, 
+                            'then': '1501-1750'
+                        },
+                        {
                             'case': {
                                 '$gte': [
-                                    '$cleanmatchHistory.avg_elo', 1400
+                                    '$cleanmatchHistory.avg_elo', 1751
                                 ]
                             }, 
-                            'then': '1400-2000'
+                            'then': '1751-2000'
                         }
                     ]
                 }
             }
         }
     }, {
-        '$facet': {
-            'eloBin': [
-                {
-                    '$group': {
-                        '_id': {
-                            'civ_id': '$cleanmatchHistory.civilization_id', 
-                            'elo_bin': '$cleanmatchHistory.elo_bin', 
-                            'matchDay': '$matchDay'
-                        }, 
-                        'matchDay': {
-                            '$first': '$matchDay'
-                        }, 
-                        'totalResults': {
-                            '$sum': 1
-                        }, 
-                        'avgDuration': {
-                            '$avg': '$matchDuration'
-                        }, 
-                        'totalWins': {
-                            '$sum': {
-                                '$cond': [
-                                    {
-                                        '$eq': [
-                                            '$cleanmatchHistory.outcome', 1
-                                        ]
-                                    }, 1, 0
-                                ]
-                            }
-                        }
-                    }
-                }
-            ], 
-            'allBin': [
-                {
-                    '$group': {
-                        '_id': {
-                            'civ_id': '$cleanmatchHistory.civilization_id', 
-                            'elo_bin': 'all', 
-                            'matchDay': '$matchDay'
-                        }, 
-                        'matchDay': {
-                            '$first': '$matchDay'
-                        }, 
-                        'totalResults': {
-                            '$sum': 1
-                        }, 
-                        'avgDuration': {
-                            '$avg': '$matchDuration'
-                        }, 
-                        'totalWins': {
-                            '$sum': {
-                                '$cond': [
-                                    {
-                                        '$eq': [
-                                            '$cleanmatchHistory.outcome', 1
-                                        ]
-                                    }, 1, 0
-                                ]
-                            }
-                        }
-                    }
-                }
-            ]
-        }
-    }, {
-        '$project': {
-            'combined': {
-                '$concatArrays': [
-                    '$eloBin', '$allBin'
-                ]
-            }
-        }
-    }, {
-        '$unwind': {
-            'path': '$combined'
-        }
-    }, {
         '$group': {
             '_id': {
-                'elo_bin': '$combined._id.elo_bin', 
-                'matchDay': '$combined._id.matchDay'
+                'civ_id': '$cleanmatchHistory.civilization_id', 
+                'elo_bin': '$cleanmatchHistory.elo_bin', 
+                'matchDay': '$matchDay'
             }, 
-            'totalResultsinEloBracket': {
-                '$sum': '$combined.totalResults'
+            'matchDay': {
+                '$first': '$matchDay'
             }, 
-            'combinedDocs': {
-                '$push': {
-                    'totalWins': '$combined.totalWins', 
-                    'totalResults': '$combined.totalResults', 
-                    'avgDuration': '$combined.avgDuration', 
-                    'matchDay': '$combined.matchDay', 
-                    '_id': '$combined._id'
+            'totalResults': {
+                '$sum': 1
+            }, 
+            'avgDuration': {
+                '$avg': '$matchDuration'
+            }, 
+            'totalWins': {
+                '$sum': {
+                    '$cond': [
+                        {
+                            '$eq': [
+                                '$cleanmatchHistory.outcome', 1
+                            ]
+                        }, 1, 0
+                    ]
                 }
-            }
-        }
-    }, {
-        '$addFields': {
-            'combinedDocs.totalResultsinEloBracket': '$totalResultsinEloBracket'
-        }
-    }, {
-        '$project': {
-            'totalResultsinEloBracket': 0, 
-            '_id': 0
-        }
-    }, {
-        '$unwind': {
-            'path': '$combinedDocs'
-        }
-    }, {
-        '$replaceRoot': {
-            'newRoot': '$combinedDocs'
-        }
-    }, {
-        '$addFields': {
-            'winRate': {
-                '$cond': [
-                    {
-                        '$eq': [
-                            '$totalResults', 0
-                        ]
-                    }, 0, {
-                        '$multiply': [
-                            {
-                                '$divide': [
-                                    '$totalWins', '$totalResults'
-                                ]
-                            }, 100
-                        ]
-                    }
-                ]
-            }
-        }
-    }, {
-        '$addFields': {
-            'playRate': {
-                '$cond': [
-                    {
-                        '$eq': [
-                            '$totalResultsinEloBracket', 0
-                        ]
-                    }, 0, {
-                        '$multiply': [
-                            {
-                                '$divide': [
-                                    '$totalResults', '$totalResultsinEloBracket'
-                                ]
-                            }, 100
-                        ]
-                    }
-                ]
             }
         }
     }, {
@@ -365,46 +245,47 @@ def civ_stats_pipeline(start_date, end_date):
                         {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '0-799'
+                                    '$_id.elo_bin', '0-750'
                                 ]
                             }, 
                             'then': 0
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '800-999'
+                                    '$_id.elo_bin', '751-1000'
                                 ]
                             }, 
-                            'then': 800
+                            'then': 751
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1000-1199'
+                                    '$_id.elo_bin', '1001-1250'
                                 ]
                             }, 
-                            'then': 1000
+                            'then': 1001
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1200-1399'
+                                    '$_id.elo_bin', '1251-1500'
                                 ]
                             }, 
-                            'then': 1200
+                            'then': 1251
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1400-2000'
+                                    '$_id.elo_bin', '1501-1750'
                                 ]
                             }, 
-                            'then': 1400
-                        }, {
+                            'then': 1501
+                        },
+                        {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', 'all'
+                                    '$_id.elo_bin', '1751-2000'
                                 ]
                             }, 
-                            'then': 0
-                        }
+                            'then': 1751
+                        },
                     ], 
                     'default': None
                 }
@@ -415,42 +296,42 @@ def civ_stats_pipeline(start_date, end_date):
                         {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '0-799'
+                                    '$_id.elo_bin', '0-750'
                                 ]
                             }, 
-                            'then': 799
+                            'then': 750
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '800-999'
+                                    '$_id.elo_bin', '751-1000'
                                 ]
                             }, 
-                            'then': 999
+                            'then': 1000
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1000-1199'
+                                    '$_id.elo_bin', '1001-1250'
                                 ]
                             }, 
-                            'then': 1199
+                            'then': 1250
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1200-1399'
+                                    '$_id.elo_bin', '1251-1500'
                                 ]
                             }, 
-                            'then': 1399
+                            'then': 1500
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', '1400-2000'
+                                    '$_id.elo_bin', '1501-1750'
                                 ]
                             }, 
-                            'then': 2000
+                            'then': 1750
                         }, {
                             'case': {
                                 '$eq': [
-                                    '$_id.elo_bin', 'all'
+                                    '$_id.elo_bin', '1751-2000'
                                 ]
                             }, 
                             'then': 2000
