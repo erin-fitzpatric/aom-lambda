@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM Template for Stats Extractor
+
+Globals:
+  Function:
+    Timeout: 300
+    MemorySize: 256
+    Runtime: python3.11
+    Architectures:
+      - x86_64
+    Handler: civs_stats.lambda_handler
+
+Resources:
+  CivsStatsExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+    Events:
+      ExtractStats:
+        Type: Schedule
+        Properties:
+          Schedule: cron(0 2 * * ? *) # every day at 2 am UTC
+
+Outputs:
+  CivsStatsExtractorFunctionArn:
+    Description: "ARN for the CivsStatsExtractorFunction"
+    Value: !GetAtt CivsStatsExtractorFunction.Arn
