@@ -1,11 +1,15 @@
 import os
+from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime, timedelta, timezone, UTC
+
+load_dotenv()
 
 # auth
 username = os.getenv("MONGO_USER")
 password = os.getenv("MONGO_PASS")
 mongo_url = os.getenv("MONGO_URL")
+
 
 # mongo params
 full_url = f"mongodb+srv://{username}:{password}@{mongo_url}"
