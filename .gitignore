@@ -138,7 +138,7 @@ dist/
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
-
+.vscode
 # Temporary folders
 tmp/
 temp/
@@ -150,7 +150,8 @@ temp/
 .LSOverride
 
 # Icon must end with two \r
-Icon
+Icon
+
 
 # Thumbnails
 ._*
