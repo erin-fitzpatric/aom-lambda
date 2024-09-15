@@ -40,7 +40,7 @@ Resources:
   CivsStatsExtractorFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: .
+      CodeUri: extract-stats/
       Runtime: python3.11
       Handler: civs_stats.lambda_handler
       Events:
