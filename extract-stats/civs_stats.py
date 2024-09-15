@@ -1,15 +1,12 @@
 import os
-from dotenv import load_dotenv
 from pymongo import MongoClient
 from datetime import datetime, timedelta, timezone, UTC
-
-load_dotenv()
 
 # auth
 username = os.getenv("MONGO_USER")
 password = os.getenv("MONGO_PASS")
 mongo_url = os.getenv("MONGO_URL")
-
+target_str = os.getenv("TARGET_STR")
 
 # mongo params
 full_url = f"mongodb+srv://{username}:{password}@{mongo_url}"
@@ -407,14 +404,24 @@ def create_daily_stats(target, ingest_custom_range=False, start_date=None, end_d
 
 
 def lambda_handler(event, context):
-   
-    target = db[event["target"]]
-    ingest_custom_range = event["ingest_custom_range"]
-    # convert date strings to python datetime objects
-    start_date = datetime.strptime(event["start_date"], '%m/%d/%Y')
-    end_date = datetime.strptime(event["end_date"], '%m/%d/%Y')
+    
+    print("EVENT DICT-LIKE:")
+    print(event)
+
+    target = db[target_str]
+
+    if "ingest_custom_range" in event:
+        ingest_custom_range = event["ingest_custom_range"]
+    else:
+        ingest_custom_range = False
+
+    if "start_date" in event and "end_date" in event:
+        # convert date strings to python datetime objects
+        start_date = datetime.strptime(event["start_date"], '%m/%d/%Y')
+        end_date = datetime.strptime(event["end_date"], '%m/%d/%Y')
+    else:
+        start_date = None
+        end_date = None
 
     docs = create_daily_stats(target, ingest_custom_range, start_date, end_date)
     print(f"Created {len(docs)} daily stats documents.")
-    return docs
-
