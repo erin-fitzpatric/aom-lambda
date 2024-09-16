@@ -1,40 +1,62 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: SAM Template for Leaderboard Extractor
+Description: Combined SAM Template for AoM.GG Lambda Functions
 
 Globals:
   Function:
     Timeout: 300
     MemorySize: 256
-    Runtime: nodejs20.x
     Architectures:
       - x86_64
-    Handler: app.lambdaHandler
 
 Resources:
+  # Leaderboard Extractor Function
   LeaderboardExtractorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: extract-leaderboard/
+      Runtime: nodejs20.x
+      Handler: app.lambdaHandler
       Events:
         ExtractLeaderboard:
           Type: Schedule
           Properties:
             Schedule: rate(5 minutes)
+
+  # Match Extractor Function
   MatchExtractorFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: extract-matches/
+      Runtime: nodejs20.x
+      Handler: app.lambdaHandler
       Events:
-        ExtractLeaderboard:
+        ExtractMatches:
           Type: Schedule
           Properties:
-            Schedule: rate(1 hours)
+            Schedule: rate(1 hour)
 
+  # Civs Stats Extractor Function
+  CivsStatsExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: extract-stats/
+      Runtime: python3.11
+      Handler: civs_stats.lambda_handler
+      Events:
+        ExtractStats:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 2 * * ? *) # every day at 2 am UTC
 Outputs:
   LeaderboardExtractorFunctionArn:
     Description: "ARN for the Leaderboard Extractor function"
     Value: !GetAtt LeaderboardExtractorFunction.Arn
+
   MatchExtractorFunctionArn:
     Description: "ARN for the Match Extractor function"
     Value: !GetAtt MatchExtractorFunction.Arn
+
+  CivsStatsExtractorFunctionArn:
+    Description: "ARN for the CivsStatsExtractorFunction"
+    Value: !GetAtt CivsStatsExtractorFunction.Arn
