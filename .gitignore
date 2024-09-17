@@ -209,3 +209,6 @@ $RECYCLE.BIN/
 
 # lambdas wierd env file 
 locals.json
+
+# python 
+__pycache__
