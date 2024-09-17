@@ -401,7 +401,7 @@ def civ_stats_pipeline(start_date, end_date):
         }
     }, {
         '$addFields': {
-            'oppObj': {
+            'matchups': {
                 '$arrayToObject': {
                     '$map': {
                         'input': '$oppData', 
@@ -421,7 +421,7 @@ def civ_stats_pipeline(start_date, end_date):
         }
     }, {
         '$addFields': {
-            'mapObj': {
+            'maps': {
                 '$arrayToObject': {
                     '$map': {
                         'input': '$mapData', 
@@ -640,3 +640,7 @@ def lambda_handler(event, context):
 
     docs = create_daily_stats(target, ingest_custom_range, start_date, end_date)
     print(f"Created {len(docs)} daily stats documents.")
+
+# for running as script in local testing
+# if __name__ == "__main__":
+#     lambda_handler(event, None)
