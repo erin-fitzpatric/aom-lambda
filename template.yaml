@@ -48,13 +48,7 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: cron(0 2 * * ? *) # every day at 2 am UTC
-      Environment:
-        Variables:
-          MONGO_USER: ""
-          MONGO_PASS: ""
-          MONGO_URL: ""
-          TARGET_STR: ""
-      
+
 
 Outputs:
   LeaderboardExtractorFunctionArn:
