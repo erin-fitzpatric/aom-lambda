@@ -48,6 +48,7 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: cron(0 2 * * ? *) # every day at 2 am UTC
+
 Outputs:
   LeaderboardExtractorFunctionArn:
     Description: "ARN for the Leaderboard Extractor function"
