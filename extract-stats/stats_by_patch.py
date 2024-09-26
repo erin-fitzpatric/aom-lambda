@@ -67,6 +67,7 @@ def generate_int_elo_bounds(elo_cutoffs, bound):
     return branch_list
 
 
+# mongo pipeline -------------------------------------------
 def civs_stats_pipeline(patch_start, patch_end, build_number):
     pipeline = [
     {
@@ -457,6 +458,7 @@ def civs_stats_pipeline(patch_start, patch_end, build_number):
     ]
 
     return pipeline
+# --------------------------------------------------------
 
 
 def upsert_to_mongo(target, docs): 
@@ -469,6 +471,10 @@ def upsert_to_mongo(target, docs):
 
 
 def create_stats_by_patch(target, ingest_all=False):
+    """
+    Target (str): Name of the collection to upsert to
+    ingest_all (bool): True to ingest all builds, False to only ingest latest build
+    """
 
     build_cursor = builds.find() # calc end date for build, should probably be in db
     build_docs = list(build_cursor)
