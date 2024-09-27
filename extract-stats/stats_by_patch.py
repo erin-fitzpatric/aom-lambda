@@ -1,31 +1,16 @@
 import os
-from pymongo import MongoClient
+from pymongo import MongoClient, ASCENDING
 from datetime import datetime, timedelta, UTC
 import itertools
 
-# params 
+# params
 ELO_CUTOFFS = [
-    [0, 100],
-    [101, 200],
-    [201, 300],
-    [301, 400],
-    [401, 500],
-    [501, 600],
-    [601, 700],
-    [701, 800],
-    [801, 900],
-    [901, 1000],
-    [1001, 1100],
-    [1101, 1200],
-    [1201, 1300],
-    [1301, 1400],
-    [1401, 1500],
-    [1501, 1600],
-    [1601, 1700],
-    [1701, 1800],
-    [1801, 1900],
-    [1901, 2000],
-    [2001, 2100]
+    [0, 750],
+    [751, 1000],
+    [1001, 1250],
+    [1251, 1500],
+    [1501, 1750],
+    [1751, 2000],
 ]
 
 # auth
@@ -473,16 +458,15 @@ def upsert_to_mongo(target, docs):
 def create_stats_by_patch(target, ingest_all=False):
     """
     Target (str): Name of the collection to upsert to
-    ingest_all (bool): True to ingest all builds, False to only ingest latest build
+    ingest_all (bool): True to ingest all builds, False (default) to only ingest latest build
     """
 
-    build_cursor = builds.find() # calc end date for build, should probably be in db
+    build_cursor = builds.find().sort('releaseDate', ASCENDING) 
     build_docs = list(build_cursor)
-    build_docs
 
     build_dict = build_docs.copy()
     for i, build in enumerate(build_docs[:-1]): # iterate through builds, set end to 1 second before next build
-        build_dict[i]['endDate'] = build_docs[i + 1]["releaseDate"] - timedelta(seconds=1)
+        build_dict[i]['endDate'] = build_docs[i + 1]["releaseDate"] - timedelta(seconds=1) # calc end date for build, should probably be in db
 
         # latest build endtime is now
         build_dict[-1]['endDate'] = datetime.now(UTC)
@@ -533,9 +517,9 @@ def create_stats_by_patch(target, ingest_all=False):
         return docs
 
 # example event   
-event = {
-    "ingest_all": True,
-}
+# event = {
+#     "ingest_all": False,
+# }
 
 def lambda_handler(event, context):
     print("EVENT DICT-LIKE:")
@@ -552,5 +536,5 @@ def lambda_handler(event, context):
     print(f"Created {len(docs)} stats documents grouped by patch")
 
 # for running as script in local testing
-if __name__ == "__main__":
-    lambda_handler(event, None)
+# if __name__ == "__main__":
+#     lambda_handler(event, None)
