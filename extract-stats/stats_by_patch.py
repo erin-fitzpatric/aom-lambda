@@ -1,5 +1,5 @@
 import os
-from pymongo import MongoClient, ASCENDING
+from pymongo import MongoClient, ASCENDING, ReplaceOne
 from datetime import datetime, timedelta, UTC
 import itertools
 
@@ -446,14 +446,18 @@ def civs_stats_pipeline(patch_start, patch_end, build_number):
 # --------------------------------------------------------
 
 
-def upsert_to_mongo(target, docs): 
+def upsert_to_mongo(target, docs):
+    operations = []
+
     for doc in docs:
         query = {"metaField.civ_id": doc["metaField"]["civ_id"],
                  "metaField.elo_bin": doc["metaField"]["elo_bin"],
                  "metaField.buildNumber": doc["metaField"]["buildNumber"]}
         
-        target.replace_one(query, doc, upsert=True)
+        operations.append(ReplaceOne(query, doc, upsert=True))
 
+    if operations:
+        target.bulk_write(operations, ordered=False)
 
 def create_stats_by_patch(target, ingest_all=False):
     """
@@ -518,7 +522,7 @@ def create_stats_by_patch(target, ingest_all=False):
 
 # example event   
 # event = {
-#     "ingest_all": False,
+#     "ingest_all": True,
 # }
 
 def lambda_handler(event, context):
