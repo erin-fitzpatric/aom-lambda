@@ -17,6 +17,7 @@ Resources:
       CodeUri: extract-leaderboard/
       Runtime: nodejs20.x
       Handler: app.lambdaHandler
+      MemorySize: 512
       Events:
         ExtractLeaderboard:
           Type: Schedule
