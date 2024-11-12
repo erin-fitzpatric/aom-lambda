@@ -49,6 +49,20 @@ Resources:
           Type: Schedule
           Properties:
             Schedule: cron(0 2 * * ? *) # every day at 2 am UTC
+
+  # Civs Stats grouped by build/patch
+  PatchStatsExtractorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: extract-stats/
+      Runtime: python3.11
+      Handler: stats_by_patch.lambda_handler
+      Events:
+        ExtractPatchStats:
+          Type: Schedule
+          Properties:
+            Schedule: cron(0 * * * ? *) # every hour if it won't smoke the db? 
+
 Outputs:
   LeaderboardExtractorFunctionArn:
     Description: "ARN for the Leaderboard Extractor function"
@@ -61,3 +75,7 @@ Outputs:
   CivsStatsExtractorFunctionArn:
     Description: "ARN for the CivsStatsExtractorFunction"
     Value: !GetAtt CivsStatsExtractorFunction.Arn
+  
+  PatchStatsExtractorFunctionArn:
+    Description: "ARN for the PatchStatsExtractorFunction"
+    Value: !GetAtt PatchStatsExtractorFunction.Arn
